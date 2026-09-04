@@ -27,8 +27,8 @@ volatile bool     target_received = false;
 
 const uint8_t POSITION_MESSAGE_TYPE = 0x01;
 
-int     target_x   = 0;
-int     target_y   = 0;
+int16_t target_x   = 0;
+int16_t target_y   = 0;
 int16_t target_deg = 0;
 
 void processCommand(const char* input);
