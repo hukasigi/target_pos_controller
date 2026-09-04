@@ -42,6 +42,12 @@ void appendInt16(std::vector<uint8_t>& data, int16_t value) {
     data.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
 }
 
+int16_t readInt16(const std::vector<uint8_t>& data, size_t index) {
+    const uint16_t value = static_cast<uint16_t>(data[index]) | (static_cast<uint16_t>(data[index + 1]) << 8);
+
+    return static_cast<int16_t>(value);
+}
+
 void processCommand(const char* input) {
     if (input == nullptr || input[0] == '\0') {
         return;
@@ -81,21 +87,15 @@ void processCommand(const char* input) {
 }
 
 void peer_link_recv_cb(const peer_id_t peer_id, const std::vector<Message>& messages) {
-
     for (const Message& message : messages) {
-        if (message.type != POSITION_MESSAGE_TYPE || message.data.size() != sizeof(Position)) {
+        if (message.type != POSITION_MESSAGE_TYPE || message.data.size() < 6) {
             continue;
         }
 
-        Position received_position;
+        now_pos.x   = readInt16(message.data, 0);
+        now_pos.y   = readInt16(message.data, 2);
+        now_pos.deg = readInt16(message.data, 4);
 
-        const void* raw_data = static_cast<const void*>(message.data.data());
-
-        std::memcpy(&received_position, raw_data, sizeof(Position));
-
-        now_pos.x       = received_position.x;
-        now_pos.y       = received_position.y;
-        now_pos.deg     = received_position.deg;
         target_received = true;
 
         Serial.printf("from 0x%02X: x=%.3f y=%.3f deg=%.3f\n", peer_id, now_pos.x, now_pos.y, now_pos.deg);
