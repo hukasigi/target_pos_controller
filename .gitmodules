@@ -1,0 +1,3 @@
+[submodule "lib/utility"]
+	path = lib/utility
+	url = git@github.com:NiiRoboKen/robocon_2026_utility.git

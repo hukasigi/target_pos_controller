@@ -1,26 +1,20 @@
 #include "SerialConsole.h"
+#include "message.h"
 #include <Arduino.h>
 #include <cstdint>
 #include <cstring>
 #include <peer_link.h>
 
-struct Position {
-        int16_t x;
-        int16_t y;
-        int16_t deg;
-};
-
 const uint8_t   WIFI_CHANNEL = 14;
 const peer_id_t FROM_PEER_ID = 0x12;
 const peer_id_t TO_PEER_ID   = 0x11;
 
-const uint8_t POSITION_MESSAGE_TYPE = 0x01;
+int16_t target_x      = 0;
+int16_t target_y      = 0;
+int16_t target_deg    = 0;
+bool    using_gamepad = 0;
 
-int16_t target_x   = 0;
-int16_t target_y   = 0;
-int16_t target_deg = 0;
-
-Position now_pos;
+TabletData now_status;
 
 void processCommand(const char* input);
 
@@ -32,9 +26,10 @@ void processCommand(const char* input) {
     }
 
     if (strcasecmp(input, "stop") == 0) {
-        target_x   = 0;
-        target_y   = 0;
-        target_deg = 0;
+        target_x      = 0;
+        target_y      = 0;
+        target_deg    = 0;
+        using_gamepad = false;
 
         Serial.println("target reset");
         return;
@@ -44,40 +39,40 @@ void processCommand(const char* input) {
         // m<target_x>,<target_y>,<target_deg>
         // 例: m100,-50,30
 
-        double x   = 0.0;
-        double y   = 0.0;
-        double deg = 0.0;
-
-        if (sscanf(input + 1, " %lf%*[ ,]%lf%*[ ,]%lf", &x, &y, &deg) != 3) {
-            Serial.println("usage: m<target_x>,<target_y>,<target_deg>");
+        int tmp_x       = 0;
+        int tmp_y       = 0;
+        int tmp_deg     = 0;
+        int tmp_gamepad = 0;
+        if (sscanf(input + 1, " %d%*[ ,]%d%*[ ,]%d%*[ ,]%d", &tmp_x, &tmp_y, &tmp_deg, &tmp_gamepad) != 4) {
+            Serial.println("usage: m<target_x>,<target_y>,<target_deg>,<gamepad_status>");
             return;
         }
+        target_x      = tmp_x;
+        target_y      = tmp_y;
+        target_deg    = tmp_deg;
+        using_gamepad = tmp_gamepad != 0;
 
-        target_x   = static_cast<int16_t>(lround(x));
-        target_y   = static_cast<int16_t>(lround(y));
-        target_deg = static_cast<int16_t>(lround(deg));
-
-        Serial.printf("target_x=%d target_y=%d target_deg=%d\n", target_x, target_y, target_deg);
+        Serial.printf("target_x=%d target_y=%d target_deg=%d gamepad=%d\n", target_x, target_y, target_deg, using_gamepad);
 
         return;
     }
 
-    Serial.println("usage: m100,-50,30 or stop");
+    Serial.println("usage: m100,-50,30,1 or stop");
 }
 
 void peer_link_recv_cb(const peer_id_t peer_id, const std::vector<Message>& messages) {
     for (const Message& message : messages) {
 
-        if (message.type != POSITION_MESSAGE_TYPE) {
+        if (message.type != static_cast<uint8_t>(MessageType::RobotState)) {
             continue;
         }
 
-        if (message.data.size() != sizeof(Position)) {
+        if (message.data.size() != sizeof(TabletData)) {
             Serial.println("invalid position data");
             continue;
         }
 
-        memcpy(&now_pos, message.data.data(), sizeof(Position));
+        memcpy(&now_status, message.data.data(), sizeof(TabletData));
     }
 }
 
@@ -93,19 +88,20 @@ void loop() {
     if (peer_link_is_peer_exist(TO_PEER_ID)) {
 
         // 送信する構造体
-        Position position;
+        TabletData target_status;
 
-        position.x   = target_x;
-        position.y   = target_y;
-        position.deg = target_deg;
+        target_status.x           = target_x;
+        target_status.y           = target_y;
+        target_status.deg         = target_deg;
+        target_status.gamepad_use = using_gamepad;
 
         // 構造体をバイト列としてコピー
-        std::vector<uint8_t> payload(sizeof(Position));
+        std::vector<uint8_t> payload(sizeof(TabletData));
 
-        memcpy(payload.data(), &position, sizeof(Position));
+        memcpy(payload.data(), &target_status, sizeof(TabletData));
 
         Message message;
-        message.type = POSITION_MESSAGE_TYPE;
+        message.type = static_cast<uint8_t>(MessageType::RobotState);
         message.data = payload;
 
         std::vector<Message> messages;
@@ -120,7 +116,7 @@ void loop() {
     } else {
         Serial.println("target peer not found");
     }
-
-    Serial.printf("x=%d y=%d deg=%d\n", now_pos.x, now_pos.y, now_pos.deg);
-    delay(1000);
+    Serial.printf("received: x=%d y=%d deg=%d gamepad_use=%d\n", now_status.x, now_status.y, now_status.deg,
+                  now_status.gamepad_use);
+    delay(10);
 }
