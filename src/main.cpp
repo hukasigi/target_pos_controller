@@ -48,8 +48,11 @@ void processCommand(const char* command) {
         String data = input.substring(1);
         data.trim();
 
-        int  start = 0;
-        int  values[3];
+        // 文字列のどこから始めればいいか
+        int start = 0;
+        // 切り出した数値入れる
+        int values[3];
+        // 値が更新されたか
         bool updated[3] = {false, false, false};
 
         for (int i = 0; i < 3; i++) {
@@ -57,6 +60,7 @@ void processCommand(const char* command) {
 
             String value;
 
+            // カンマを基準に文字列を切り出す
             if (comma >= 0) {
                 value = data.substring(start, comma);
                 start = comma + 1;
@@ -65,13 +69,14 @@ void processCommand(const char* command) {
                 start = data.length();
             }
 
+            // 前後の空白を消して、数値に変換する
             value.trim();
-
             if (value.length() > 0) {
                 values[i]  = value.toInt();
                 updated[i] = true;
             }
 
+            // 文字列の最後まで来たらループ抜ける
             if (start >= data.length()) {
                 break;
             }
